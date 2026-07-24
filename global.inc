@@ -1,12 +1,32 @@
 <?php
-include("settings.inc");
-$db = new PDO("sqlite:$dbFilePath");
+include_once('settings.inc');
+// Use the $db_file variable from settings.inc
+$db = new PDO("sqlite:" . $db_file);
 
 $db->exec("CREATE TABLE IF NOT EXISTS songdb (song_id integer PRIMARY KEY AUTOINCREMENT, artist text, title  TEXT, combined TEXT UNIQUE)"); 
 $db->exec("CREATE TABLE IF NOT EXISTS state (accepting bool, serial integer NOT NULL)");
 $db->exec("INSERT OR IGNORE INTO state (rowid,accepting,serial) VALUES(0,0,1)");
 $db->exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_songstrings ON songdb(combined)");
-$db->exec("CREATE TABLE IF NOT EXISTS requests (request_id integer PRIMARY KEY AUTOINCREMENT, artist TEXT, title TEXT, singer TEXT, request_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP)");
+$db->exec("CREATE TABLE IF NOT EXISTS requests (request_id integer PRIMARY KEY AUTOINCREMENT, artist TEXT, title TEXT, singer TEXT, request_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP, key_change INTEGER DEFAULT 0)");
+// Migration for databases created before key_change existed. Wrapped in
+// try/catch because PDO's default error mode varies by PHP version (PHP 8.1+
+// defaults to ERRMODE_EXCEPTION, older versions default to ERRMODE_SILENT),
+// and this call is expected to fail harmlessly once the column already exists.
+try {
+	$db->exec("ALTER TABLE requests ADD COLUMN key_change INTEGER DEFAULT 0");
+} catch (PDOException $e) {
+	// Column already exists, nothing to do.
+}
+
+$db->exec("CREATE TABLE IF NOT EXISTS singers (singer_id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT UNIQUE NOT NULL, password_hash TEXT NOT NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)");
+$db->exec("CREATE TABLE IF NOT EXISTS favorites (favorite_id INTEGER PRIMARY KEY AUTOINCREMENT, singer_id INTEGER NOT NULL, artist TEXT NOT NULL, title TEXT NOT NULL, added_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, UNIQUE(singer_id, artist, title))");
+$db->exec("CREATE INDEX IF NOT EXISTS idx_favorites_singer ON favorites(singer_id)");
+
+// Singer accounts are only used by this web songbook, on top of the shared
+// browser session. Sessions are how we know which singer is "logged in".
+if (session_status() === PHP_SESSION_NONE) {
+	session_start();
+}
 
 $path = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
 $songdbtable = "songdb";
@@ -37,11 +57,13 @@ function sitefooter() {
 function navbar($backurl) 
 {
 	if ($backurl == "")
-		$backurl = index.php;
+		$backurl = "index.php";
 	global $screensize;
 	echo "<div class=navbar>
 	<span class=title>OpenKJ Songbook</span>
-	</div><div class=mainbody><span class=backbtn><a class=button href=\"$backurl\" class=navbar id=backlink>Back</a></span>";
+	</div><div class=mainbody><span class=backbtn><a class=button href=\"$backurl\" class=navbar id=backlink>Back</a></span><span class=acctwrap>";
+	accountLinks();
+	echo "</span>";
 }
 
 function setAccepting($accepting)
@@ -85,6 +107,14 @@ function searchform()
 		echo "<br><p><form method=get action=search.php>Song search: <input type=text name=q autofocus autocomplete=off><input type=submit value=Search></form></p>";
 		echo '<p class=info>You may enter any part of the artist and/or title of the song.  Partial words are allowed.</p>
 			<p class=info>For example "pai bla stone" would match "Rolling Stones, The - Paint it black".</p>';
+		if (isLoggedIn())
+		{
+			echo '<p class=info>Tap the &#9734; next to a search result to save it to <a href="favorites.php">My Favorites</a>.</p>';
+		}
+		else
+		{
+			echo '<p class=info><a href="register.php">Create a free account</a> to save your favorite songs and request them again in one tap.</p>';
+		}
 	}
 }
 
@@ -142,11 +172,62 @@ function getVenues()
 	return $venues;
 }
 
+function isLoggedIn()
+{
+	return isset($_SESSION['singer_id']);
+}
+
+function currentSingerId()
+{
+	return isset($_SESSION['singer_id']) ? (int)$_SESSION['singer_id'] : null;
+}
+
+function currentUsername()
+{
+	return $_SESSION['username'] ?? null;
+}
+
+// Sends the browser to $redirectTo and stops execution if nobody is logged
+// in. Must be called before any HTML has been echoed on the calling page.
+function requireLogin($redirectTo = 'login.php')
+{
+	if (!isLoggedIn())
+	{
+		header("Location: $redirectTo");
+		exit();
+	}
+}
+
+function accountLinks()
+{
+	if (isLoggedIn())
+	{
+		$username = htmlspecialchars(currentUsername());
+		echo "<span class=accountbar>Signed in as $username &middot; <a class=navbar href=\"favorites.php\">My Favorites</a> &middot; <a class=navbar href=\"logout.php\">Log out</a></span>";
+	}
+	else
+	{
+		echo "<span class=accountbar><a class=navbar href=\"login.php\">Log in</a> &middot; <a class=navbar href=\"register.php\">Create account</a></span>";
+	}
+}
+
+function keyChangeSelect()
+{
+	echo "Key change (optional): <select name=keychange>";
+	for ($i = 6; $i >= -6; $i--)
+	{
+		$label = $i == 0 ? "No change" : ($i > 0 ? "+$i" : $i);
+		$selected = $i == 0 ? " selected" : "";
+		echo "<option value=\"$i\"$selected>$label</option>";
+	}
+	echo "</select><br>";
+}
+
 function getRequests()
 {
         global $db;
         $requests = array();
-        $result = $db->query("SELECT request_id,artist,title,singer,strftime('%s', request_time) AS unixtime FROM requests");
+        $result = $db->query("SELECT request_id,artist,title,singer,key_change,strftime('%s', request_time) AS unixtime FROM requests");
 	if ($result)
 	{
         	foreach ($result as $row)
@@ -156,6 +237,7 @@ function getRequests()
         	        $request['title'] = $row['title'];
         	        $request['singer'] = $row['singer'];
         	        $request['request_time'] = (int)$row['unixtime'];
+        	        $request['key_change'] = (int)$row['key_change'];
         	        $requests['requests'][] = $request;
         	}
 	}
