@@ -1,6 +1,8 @@
 # OpenKJ Standalone Request Server
 Standalone basic single-venue request server implementation for use with OpenKJ.
+
 +Adding the ability for singers to create accounts and save favorite songs
+
 +Adding the ability for Singers to request Key Changes when submitting requests
 
 
