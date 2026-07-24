@@ -36,13 +36,17 @@ if ($command == "submitRequest")
 {
 	$songId = $data['songId'];
 	$singerName = $data['singerName'];
+	$keyChange = isset($data['keyChange']) ? (int)$data['keyChange'] : 0;
+	if ($keyChange < -6 || $keyChange > 6) {
+		$keyChange = 0;
+	}
 	$sql = "SELECT artist,title FROM songdb WHERE song_id = $songId";
 	foreach ($db->query($sql) as $row) {
         	$artist = $row['artist'];
         	$title = $row['title'];
 	}
-	$stmt = $db->prepare("INSERT INTO requests (singer,artist,title) VALUES(:singerName, :artist, :title)");
-	$stmt->execute(array(":singerName" => $singerName, ":artist" => $artist, ":title" => $title));
+	$stmt = $db->prepare("INSERT INTO requests (singer,artist,title,key_change) VALUES(:singerName, :artist, :title, :keyChange)");
+	$stmt->execute(array(":singerName" => $singerName, ":artist" => $artist, ":title" => $title, ":keyChange" => $keyChange));
 	newSerial();
 	$output = array('command'=>$command,'error'=>'false', 'success'=>true);
         print(json_encode($output,JSON_PRETTY_PRINT|JSON_UNESCAPED_SLASHES));
