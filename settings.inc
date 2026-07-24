@@ -1,5 +1,5 @@
 <?php
 
-$venueName = 'Default Venue';
-$dbFilePath = '/var/www/html/okjweb/okjweb.db';
+$venueName = 'YOUR VENUE NAME';
+$db_file = 'C:\\wamp64\\www\\requests\\okjweb.db';
 ?>

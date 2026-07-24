@@ -15,6 +15,9 @@ if (strlen($_GET['q']) < 3)
 }
 
 echo '<br><p>Search Results<br>Tap a song to submit it</p>';
+if (isLoggedIn()) {
+	echo '<p class=info>Tap the &#9734; to save a song to My Favorites.</p>';
+}
 
 $terms = explode(' ',$_GET['q']);
 $no = count($terms);
@@ -53,7 +56,12 @@ $res = array();
 $unique = array_unique($res);
 
 foreach ($unique as $key => $val) {
-	$entries[] = "<tr><td class=result onclick=\"submitreq(${key})\">" . $val . "</td></tr>";
+	if (isLoggedIn()) {
+		$favCell = "<td class=favcol><a class=favstar href=\"favorite-add.php?id={$key}\" title=\"Save to favorites\">&#9734;</a></td>";
+	} else {
+		$favCell = "<td class=favcol></td>";
+	}
+	$entries[] = "<tr><td class=result onclick=\"submitreq({$key})\">" . $val . "</td>$favCell</tr>";
 }
 if (count($unique) > 0) {
 	echo '<table border=1>';

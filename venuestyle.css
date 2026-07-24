@@ -96,3 +96,44 @@ input[type=button], input[type=submit], input[type=reset], a.button {
 	margin-right: 10px;
 	text-shadow: 4px 4px 4px #aaa;
 }
+span.acctwrap {
+	display: block;
+	text-align: right;
+	padding-right: 10px;
+	padding-top: 4px;
+}
+span.accountbar {
+	font-size: 0.65em;
+	font-weight: normal;
+}
+span.accountbar a.navbar {
+	color: black;
+	text-decoration: underline;
+}
+td.favcol {
+	text-align: center;
+	vertical-align: middle;
+	font-size: 1.8em;
+	width: 40px;
+}
+a.favstar {
+	color: black;
+	text-decoration: none;
+	cursor: pointer;
+}
+td.favaction {
+	text-align: center;
+	vertical-align: middle;
+}
+p.error {
+	color: #b00020;
+	font-size: 1.0em;
+}
+input[type=password] {
+	border: 2px solid black;
+	padding-top: 5px;
+	padding-bottom: 5px;
+	margin-right: 5px;
+	font-size: 1.2em;
+	font-weight: bold;
+}
