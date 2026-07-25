@@ -183,6 +183,39 @@ if ($command == "getSerial")
 	exit();
 }
 
+if ($command == "updateRotation")
+{
+	$db->beginTransaction();
+	$db->exec("DELETE FROM rotation");
+	$stmt = $db->prepare("INSERT INTO rotation (singer_id, name, position, regular, is_current) VALUES (:singerId, :name, :position, :regular, :isCurrent)");
+	$errors = array();
+	$error = "false";
+	foreach ($data['singers'] as $singer)
+	{
+		$inarray = array(
+			":singerId" => $singer['singer_id'],
+			":name" => $singer['name'],
+			":position" => $singer['position'],
+			":regular" => (int)$singer['regular'],
+			":isCurrent" => (int)$singer['is_current']
+		);
+		$result = $stmt->execute($inarray);
+		if ($result === false)
+		{
+			$errors[] = $db->errorInfo();
+			$error = "true";
+		}
+	}
+	$result = $db->commit();
+	if ($result == false)
+		$errors[] = $db->errorInfo();
+	$newSerial = newRotationSerial();
+	$output = array('command'=>$command,'error'=>$error,'errors'=>$errors,'serial'=>$newSerial);
+	header('Content-type: application/json');
+	print(json_encode($output,JSON_PRETTY_PRINT|JSON_UNESCAPED_SLASHES));
+	exit();
+}
+
 if ($command == "getAccepting")
 {
 	$accepting = getAccepting();
@@ -216,6 +249,19 @@ if ($command == "getRequests")
 {
 	$serial = getSerial();
 	$output = getRequests();
+	$output['command'] = $command;
+	$output['error'] = 'false';
+	$output['serial'] = $serial;
+	header('Content-type: application/json');
+	print(json_encode($output,JSON_PRETTY_PRINT|JSON_UNESCAPED_SLASHES));
+	exit();
+}
+
+// Public - used by rotation.php so singers can poll the queue from their phones
+if ($command == "getRotation")
+{
+	$serial = getRotationSerial();
+	$output = getRotation();
 	$output['command'] = $command;
 	$output['error'] = 'false';
 	$output['serial'] = $serial;

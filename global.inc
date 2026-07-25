@@ -22,6 +22,16 @@ $db->exec("CREATE TABLE IF NOT EXISTS singers (singer_id INTEGER PRIMARY KEY AUT
 $db->exec("CREATE TABLE IF NOT EXISTS favorites (favorite_id INTEGER PRIMARY KEY AUTOINCREMENT, singer_id INTEGER NOT NULL, artist TEXT NOT NULL, title TEXT NOT NULL, added_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, UNIQUE(singer_id, artist, title))");
 $db->exec("CREATE INDEX IF NOT EXISTS idx_favorites_singer ON favorites(singer_id)");
 
+$db->exec("CREATE TABLE IF NOT EXISTS rotation (rotation_id INTEGER PRIMARY KEY AUTOINCREMENT, singer_id INTEGER, name TEXT, position INTEGER, regular INTEGER DEFAULT 0, is_current INTEGER DEFAULT 0)");
+// Rotation gets its own serial, separate from the main "requests/songdb changed"
+// serial, so that pushing a rotation update doesn't trigger OpenKJ's own poll
+// loop into needlessly re-fetching requests and venues.
+try {
+	$db->exec("ALTER TABLE state ADD COLUMN rotation_serial INTEGER NOT NULL DEFAULT 1");
+} catch (PDOException $e) {
+	// Column already exists, nothing to do.
+}
+
 // Singer accounts are only used by this web songbook, on top of the shared
 // browser session. Sessions are how we know which singer is "logged in".
 if (session_status() === PHP_SESSION_NONE) {
@@ -61,7 +71,7 @@ function navbar($backurl)
 	global $screensize;
 	echo "<div class=navbar>
 	<span class=title>OpenKJ Songbook</span>
-	</div><div class=mainbody><span class=backbtn><a class=button href=\"$backurl\" class=navbar id=backlink>Back</a></span><span class=acctwrap>";
+	</div><div class=mainbody><span class=backbtn><a class=button href=\"$backurl\" class=navbar id=backlink>Back</a> <a class=button href=\"rotation.php\" class=navbar id=rotationlink>Who's Up Next</a></span><span class=acctwrap>";
 	accountLinks();
 	echo "</span>";
 }
@@ -141,6 +151,30 @@ function newSerial()
                 $newSerial = mt_rand(0,99999);
         }
         $db->exec("UPDATE state SET serial=$newSerial");
+        return $newSerial;
+}
+
+function getRotationSerial()
+{
+	global $db;
+	$serial = -1;
+	foreach ($db->query("SELECT rotation_serial FROM state LIMIT 1") as $row)
+        {
+        	$serial = (int)$row['rotation_serial'];
+        }
+	return $serial;
+}
+
+function newRotationSerial()
+{
+        global $db;
+        $serial = getRotationSerial();
+        $newSerial = mt_rand(0,99999);
+        while ($newSerial == $serial)
+        {
+                $newSerial = mt_rand(0,99999);
+        }
+        $db->exec("UPDATE state SET rotation_serial=$newSerial");
         return $newSerial;
 }
 
@@ -244,5 +278,24 @@ function getRequests()
         return $requests;
 }
 
+function getRotation()
+{
+        global $db;
+        $rotation = array();
+        $result = $db->query("SELECT rotation_id,singer_id,name,position,regular,is_current FROM rotation ORDER BY position ASC");
+	if ($result)
+	{
+        	foreach ($result as $row)
+        	{
+        	        $singer['singer_id'] = (int)$row['singer_id'];
+        	        $singer['name'] = $row['name'];
+        	        $singer['position'] = (int)$row['position'];
+        	        $singer['regular'] = (bool)$row['regular'];
+        	        $singer['is_current'] = (bool)$row['is_current'];
+        	        $rotation['rotation'][] = $singer;
+        	}
+	}
+        return $rotation;
+}
 
 ?>
