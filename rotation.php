@@ -20,6 +20,13 @@ else
 		$name = htmlspecialchars($singer['name']);
 		$rowClass = $singer['is_current'] ? ' class=currentsinger' : '';
 		$label = $singer['is_current'] ? "$name &nbsp; &#9834; Now Singing" : $name;
+		$songArtist = isset($singer['next_song_artist']) ? trim($singer['next_song_artist']) : '';
+		$songTitle = isset($singer['next_song_title']) ? trim($singer['next_song_title']) : '';
+		if ($songArtist !== '' || $songTitle !== '')
+		{
+			$songLine = htmlspecialchars(trim($songArtist . ' - ' . $songTitle, ' -'));
+			$label .= "<br><span class=songinfo>$songLine</span>";
+		}
 		echo "<tr$rowClass><td class=result>$label</td></tr>";
 	}
 	echo '</table>';
@@ -43,6 +50,13 @@ function renderRotation(singers) {
         var name = s.name.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
         var rowClass = s.is_current ? ' class="currentsinger"' : '';
         var label = s.is_current ? (name + ' &nbsp; &#9834; Now Singing') : name;
+        var songArtist = (s.next_song_artist || '').trim();
+        var songTitle = (s.next_song_title || '').trim();
+        if (songArtist !== '' || songTitle !== '') {
+            var songLine = (songArtist + ' - ' + songTitle).replace(/^[\s-]+|[\s-]+$/g, '');
+            songLine = songLine.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            label += '<br><span class="songinfo">' + songLine + '</span>';
+        }
         html += '<tr' + rowClass + '><td class="result">' + label + '</td></tr>';
     }
     html += '</table>';
