@@ -5,7 +5,7 @@ Standalone basic single-venue request server implementation for use with OpenKJ.
 
 +Adding the ability for Singers to request Key Changes when submitting requests
 
-+Adding the ability for Singers to view the singer queue/rotation.
++Adding the ability for Singers to view the singer queue/rotation on their device.
 
 
 Phase 1:  Making your **Windows based** computer a web server inside home or venue:
