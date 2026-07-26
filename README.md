@@ -1,9 +1,11 @@
 # OpenKJ Standalone Request Server
-Standalone basic single-venue request server implementation for use with OpenKJ.
+Standalone basic single-venue request server implementation for use with OpenKJ. post your songbook for singers to access on their device via web
 
 +Adding the ability for singers to create accounts and save favorite songs
 
 +Adding the ability for Singers to request Key Changes when submitting requests
+
++Adding the ability for Singers to view the singer queue/rotation.
 
 
 Phase 1:  Making your Windows based computer a web server inside home or venue:
