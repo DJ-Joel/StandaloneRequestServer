@@ -8,7 +8,7 @@ Standalone basic single-venue request server implementation for use with OpenKJ.
 +Adding the ability for Singers to view the singer queue/rotation.
 
 
-Phase 1:  Making your Windows based computer a web server inside home or venue:
+Phase 1:  Making your **Windows based** computer a web server inside home or venue:
 
 You need to install some files on your computer before you can make it a web server:
 Go here https://wampserver.aviatechno.net/
