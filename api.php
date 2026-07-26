@@ -187,7 +187,7 @@ if ($command == "updateRotation")
 {
 	$db->beginTransaction();
 	$db->exec("DELETE FROM rotation");
-	$stmt = $db->prepare("INSERT INTO rotation (singer_id, name, position, regular, is_current) VALUES (:singerId, :name, :position, :regular, :isCurrent)");
+	$stmt = $db->prepare("INSERT INTO rotation (singer_id, name, position, regular, is_current, next_song_artist, next_song_title) VALUES (:singerId, :name, :position, :regular, :isCurrent, :nextSongArtist, :nextSongTitle)");
 	$errors = array();
 	$error = "false";
 	foreach ($data['singers'] as $singer)
@@ -197,7 +197,9 @@ if ($command == "updateRotation")
 			":name" => $singer['name'],
 			":position" => $singer['position'],
 			":regular" => (int)$singer['regular'],
-			":isCurrent" => (int)$singer['is_current']
+			":isCurrent" => (int)$singer['is_current'],
+			":nextSongArtist" => isset($singer['next_song_artist']) ? $singer['next_song_artist'] : null,
+			":nextSongTitle" => isset($singer['next_song_title']) ? $singer['next_song_title'] : null
 		);
 		$result = $stmt->execute($inarray);
 		if ($result === false)
