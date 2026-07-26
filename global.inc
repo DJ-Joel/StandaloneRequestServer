@@ -22,7 +22,19 @@ $db->exec("CREATE TABLE IF NOT EXISTS singers (singer_id INTEGER PRIMARY KEY AUT
 $db->exec("CREATE TABLE IF NOT EXISTS favorites (favorite_id INTEGER PRIMARY KEY AUTOINCREMENT, singer_id INTEGER NOT NULL, artist TEXT NOT NULL, title TEXT NOT NULL, added_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, UNIQUE(singer_id, artist, title))");
 $db->exec("CREATE INDEX IF NOT EXISTS idx_favorites_singer ON favorites(singer_id)");
 
-$db->exec("CREATE TABLE IF NOT EXISTS rotation (rotation_id INTEGER PRIMARY KEY AUTOINCREMENT, singer_id INTEGER, name TEXT, position INTEGER, regular INTEGER DEFAULT 0, is_current INTEGER DEFAULT 0)");
+$db->exec("CREATE TABLE IF NOT EXISTS rotation (rotation_id INTEGER PRIMARY KEY AUTOINCREMENT, singer_id INTEGER, name TEXT, position INTEGER, regular INTEGER DEFAULT 0, is_current INTEGER DEFAULT 0, next_song_artist TEXT, next_song_title TEXT)");
+// The above CREATE TABLE is a no-op on deployments where rotation already
+// exists from before these two columns were added, so migrate it explicitly.
+try {
+	$db->exec("ALTER TABLE rotation ADD COLUMN next_song_artist TEXT");
+} catch (PDOException $e) {
+	// Column already exists, nothing to do.
+}
+try {
+	$db->exec("ALTER TABLE rotation ADD COLUMN next_song_title TEXT");
+} catch (PDOException $e) {
+	// Column already exists, nothing to do.
+}
 // Rotation gets its own serial, separate from the main "requests/songdb changed"
 // serial, so that pushing a rotation update doesn't trigger OpenKJ's own poll
 // loop into needlessly re-fetching requests and venues.
@@ -282,7 +294,7 @@ function getRotation()
 {
         global $db;
         $rotation = array();
-        $result = $db->query("SELECT rotation_id,singer_id,name,position,regular,is_current FROM rotation ORDER BY position ASC");
+        $result = $db->query("SELECT rotation_id,singer_id,name,position,regular,is_current,next_song_artist,next_song_title FROM rotation ORDER BY position ASC");
 	if ($result)
 	{
         	foreach ($result as $row)
@@ -292,6 +304,8 @@ function getRotation()
         	        $singer['position'] = (int)$row['position'];
         	        $singer['regular'] = (bool)$row['regular'];
         	        $singer['is_current'] = (bool)$row['is_current'];
+        	        $singer['next_song_artist'] = $row['next_song_artist'];
+        	        $singer['next_song_title'] = $row['next_song_title'];
         	        $rotation['rotation'][] = $singer;
         	}
 	}
