@@ -141,3 +141,8 @@ tr.currentsinger td.result {
 	background-color: #fff3b0;
 	border-left: 8px solid #2e7d32;
 }
+span.songinfo {
+	color: #555555;
+	font-size: 0.85em;
+	font-weight: normal;
+}
