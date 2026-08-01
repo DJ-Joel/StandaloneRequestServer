@@ -272,4 +272,135 @@ if ($command == "getRotation")
 	exit();
 }
 
+// ---------------------------------------------------------------------------
+// Chat - singer facing. These identify the singer from their login session
+// rather than any parameter, so one singer can never read or post into
+// another singer's thread by passing a different id.
+// ---------------------------------------------------------------------------
+
+if ($command == "sendChatMessage")
+{
+	if (!isLoggedIn())
+	{
+		$output = array('command'=>$command,'error'=>'true','message'=>'You must be logged in to send messages.');
+		header('Content-type: application/json');
+		print(json_encode($output,JSON_PRETTY_PRINT|JSON_UNESCAPED_SLASHES));
+		exit();
+	}
+	$text = isset($data['message']) ? $data['message'] : '';
+	$result = sendChatMessage(currentSingerId(), $text, false);
+	$output = array(
+		'command'=>$command,
+		'error'=> $result['ok'] ? 'false' : 'true',
+		'message'=> $result['error'],
+		'serial'=> getChatSerial()
+	);
+	header('Content-type: application/json');
+	print(json_encode($output,JSON_PRETTY_PRINT|JSON_UNESCAPED_SLASHES));
+	exit();
+}
+
+if ($command == "getChatThread")
+{
+	if (!isLoggedIn())
+	{
+		$output = array('command'=>$command,'error'=>'true','message'=>'You must be logged in to view messages.');
+		header('Content-type: application/json');
+		print(json_encode($output,JSON_PRETTY_PRINT|JSON_UNESCAPED_SLASHES));
+		exit();
+	}
+	$singerId = currentSingerId();
+	$output = array(
+		'command'=>$command,
+		'error'=>'false',
+		'messages'=> getChatThread($singerId),
+		'muted'=> isSingerMuted($singerId),
+		'accepting'=> getAccepting() ? true : false,
+		'serial'=> getChatSerial()
+	);
+	header('Content-type: application/json');
+	print(json_encode($output,JSON_PRETTY_PRINT|JSON_UNESCAPED_SLASHES));
+	exit();
+}
+
+// ---------------------------------------------------------------------------
+// Chat - KJ facing (called by OpenKJ). Note these are not authenticated, in
+// keeping with every other KJ command in this file (see clearRequests,
+// setAccepting, etc) - this server is designed to run on a trusted LAN.
+// ---------------------------------------------------------------------------
+
+if ($command == "getChatOverview")
+{
+	$serial = getChatSerial();
+	$output = getChatOverview();
+	$output['command'] = $command;
+	$output['error'] = 'false';
+	$output['serial'] = $serial;
+	header('Content-type: application/json');
+	print(json_encode($output,JSON_PRETTY_PRINT|JSON_UNESCAPED_SLASHES));
+	exit();
+}
+
+if ($command == "getChatSerial")
+{
+	$output = array('command'=>$command,'error'=>'false','serial'=>getChatSerial());
+	header('Content-type: application/json');
+	print(json_encode($output,JSON_PRETTY_PRINT|JSON_UNESCAPED_SLASHES));
+	exit();
+}
+
+if ($command == "sendChatReply")
+{
+	$singerId = isset($data['singerId']) ? (int)$data['singerId'] : 0;
+	$text = isset($data['message']) ? $data['message'] : '';
+	if ($singerId <= 0)
+	{
+		$output = array('command'=>$command,'error'=>'true','message'=>'A singerId is required.');
+	}
+	else
+	{
+		$result = sendChatMessage($singerId, $text, true);
+		$output = array(
+			'command'=>$command,
+			'error'=> $result['ok'] ? 'false' : 'true',
+			'message'=> $result['error'],
+			'serial'=> getChatSerial()
+		);
+	}
+	header('Content-type: application/json');
+	print(json_encode($output,JSON_PRETTY_PRINT|JSON_UNESCAPED_SLASHES));
+	exit();
+}
+
+if ($command == "setChatMessageHidden")
+{
+	$messageId = isset($data['messageId']) ? (int)$data['messageId'] : 0;
+	$hidden = isset($data['hidden']) ? (bool)$data['hidden'] : true;
+	$ok = ($messageId > 0) && setChatMessageHidden($messageId, $hidden);
+	$output = array('command'=>$command,'error'=> $ok ? 'false' : 'true','serial'=>getChatSerial());
+	header('Content-type: application/json');
+	print(json_encode($output,JSON_PRETTY_PRINT|JSON_UNESCAPED_SLASHES));
+	exit();
+}
+
+if ($command == "setSingerMuted")
+{
+	$singerId = isset($data['singerId']) ? (int)$data['singerId'] : 0;
+	$muted = isset($data['muted']) ? (bool)$data['muted'] : true;
+	$ok = ($singerId > 0) && setSingerMuted($singerId, $muted);
+	$output = array('command'=>$command,'error'=> $ok ? 'false' : 'true');
+	header('Content-type: application/json');
+	print(json_encode($output,JSON_PRETTY_PRINT|JSON_UNESCAPED_SLASHES));
+	exit();
+}
+
+if ($command == "clearChat")
+{
+	$ok = clearChat();
+	$output = array('command'=>$command,'error'=> $ok ? 'false' : 'true','serial'=>getChatSerial());
+	header('Content-type: application/json');
+	print(json_encode($output,JSON_PRETTY_PRINT|JSON_UNESCAPED_SLASHES));
+	exit();
+}
+
 ?>

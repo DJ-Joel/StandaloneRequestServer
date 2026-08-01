@@ -69,8 +69,16 @@ if (count($unique) > 0) {
 		echo $song;
 	}
 	echo '</table>';
+	if (isLoggedIn()) {
+		echo "<p class=info>Not the version you wanted? <a href=\"chat.php\">Message the KJ</a>.</p>";
+	}
 } else {
 	echo "<p>Sorry, no match found.</p>";
+	if (isLoggedIn()) {
+		echo "<p class=info>Can't find the song you wanted? <a href=\"chat.php\">Message the KJ</a> and let them know.</p>";
+	} else {
+		echo "<p class=info>Can't find the song you wanted? <a href=\"login.php?redirect=chat.php\">Log in</a> to message the KJ about it.</p>";
+	}
 }
 
 sitefooter();
