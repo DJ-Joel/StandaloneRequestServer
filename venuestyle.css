@@ -146,3 +146,32 @@ span.songinfo {
 	font-size: 0.85em;
 	font-weight: normal;
 }
+#chatThread {
+	max-height: 55vh;
+	overflow-y: auto;
+	margin-bottom: 10px;
+}
+div.chatmsg {
+	border: 2px solid black;
+	padding: 8px;
+	margin: 6px 0;
+	font-size: 1.1em;
+	background-color: white;
+	color: black;
+	text-align: left;
+}
+div.chatmsg.chatkj {
+	background-color: #fff3b0;
+	border-left: 8px solid #2e7d32;
+}
+span.chatwho {
+	font-weight: bold;
+	font-size: 0.85em;
+	color: #555555;
+}
+textarea[name=message] {
+	width: 90%;
+	border: 2px solid black;
+	font-size: 1.2em;
+	padding: 5px;
+}

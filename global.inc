@@ -44,6 +44,26 @@ try {
 	// Column already exists, nothing to do.
 }
 
+// Singer <-> KJ chat. Each row belongs to one singer's thread (singer_id),
+// regardless of who sent it - from_kj distinguishes the direction. Singers
+// only ever see their own thread; the KJ sees all of them as one stream.
+$db->exec("CREATE TABLE IF NOT EXISTS chat_messages (message_id INTEGER PRIMARY KEY AUTOINCREMENT, singer_id INTEGER NOT NULL, from_kj INTEGER NOT NULL DEFAULT 0, message_text TEXT NOT NULL, sent_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP, hidden INTEGER NOT NULL DEFAULT 0)");
+$db->exec("CREATE INDEX IF NOT EXISTS idx_chat_singer ON chat_messages(singer_id)");
+
+// Muted singers can still read their thread, they just can't send any more.
+try {
+	$db->exec("ALTER TABLE singers ADD COLUMN muted INTEGER NOT NULL DEFAULT 0");
+} catch (PDOException $e) {
+	// Column already exists, nothing to do.
+}
+
+// Chat gets its own serial too, for the same reason rotation does.
+try {
+	$db->exec("ALTER TABLE state ADD COLUMN chat_serial INTEGER NOT NULL DEFAULT 1");
+} catch (PDOException $e) {
+	// Column already exists, nothing to do.
+}
+
 // Singer accounts are only used by this web songbook, on top of the shared
 // browser session. Sessions are how we know which singer is "logged in".
 if (session_status() === PHP_SESSION_NONE) {
@@ -249,7 +269,7 @@ function accountLinks()
 	if (isLoggedIn())
 	{
 		$username = htmlspecialchars(currentUsername());
-		echo "<span class=accountbar>Signed in as $username &middot; <a class=navbar href=\"favorites.php\">My Favorites</a> &middot; <a class=navbar href=\"logout.php\">Log out</a></span>";
+		echo "<span class=accountbar>Signed in as $username &middot; <a class=navbar href=\"favorites.php\">My Favorites</a> &middot; <a class=navbar href=\"chat.php\">Message KJ</a> &middot; <a class=navbar href=\"logout.php\">Log out</a></span>";
 	}
 	else
 	{
@@ -310,6 +330,161 @@ function getRotation()
         	}
 	}
         return $rotation;
+}
+
+// ---------------------------------------------------------------------------
+// Chat helpers
+// ---------------------------------------------------------------------------
+
+function getChatSerial()
+{
+	global $db;
+	$serial = -1;
+	foreach ($db->query("SELECT chat_serial FROM state LIMIT 1") as $row)
+        {
+        	$serial = (int)$row['chat_serial'];
+        }
+	return $serial;
+}
+
+function newChatSerial()
+{
+        global $db;
+        $serial = getChatSerial();
+        $newSerial = mt_rand(0,99999);
+        while ($newSerial == $serial)
+        {
+                $newSerial = mt_rand(0,99999);
+        }
+        $db->exec("UPDATE state SET chat_serial=$newSerial");
+        return $newSerial;
+}
+
+function isSingerMuted($singerId)
+{
+	global $db;
+	$stmt = $db->prepare("SELECT muted FROM singers WHERE singer_id = :id");
+	$stmt->execute(array(':id' => (int)$singerId));
+	$row = $stmt->fetch(PDO::FETCH_ASSOC);
+	return $row ? (bool)$row['muted'] : false;
+}
+
+function setSingerMuted($singerId, $muted)
+{
+	global $db;
+	$stmt = $db->prepare("UPDATE singers SET muted = :m WHERE singer_id = :id");
+	return $stmt->execute(array(':m' => $muted ? 1 : 0, ':id' => (int)$singerId));
+}
+
+// Inserts a chat message. $fromKj distinguishes a KJ reply from a singer's
+// own message. Returns an array with 'ok' plus an 'error' string when the
+// send was refused, so callers can surface the reason to the user.
+function sendChatMessage($singerId, $text, $fromKj = false)
+{
+	global $db;
+	$text = trim($text);
+	if ($text === '')
+	{
+		return array('ok' => false, 'error' => 'Message was empty.');
+	}
+	if (strlen($text) > 1000)
+	{
+		$text = substr($text, 0, 1000);
+	}
+	// The KJ can always reply - including after switching requests off, so a
+	// conversation already in progress can be finished. Singer-initiated
+	// messages are gated on both the accepting flag and their mute state.
+	if (!$fromKj)
+	{
+		if (!getAccepting())
+		{
+			return array('ok' => false, 'error' => 'The KJ is not currently accepting messages.');
+		}
+		if (isSingerMuted($singerId))
+		{
+			return array('ok' => false, 'error' => 'You have been muted and cannot send further messages.');
+		}
+	}
+	$stmt = $db->prepare("INSERT INTO chat_messages (singer_id, from_kj, message_text) VALUES (:sid, :fromkj, :txt)");
+	$ok = $stmt->execute(array(':sid' => (int)$singerId, ':fromkj' => $fromKj ? 1 : 0, ':txt' => $text));
+	if ($ok)
+	{
+		newChatSerial();
+	}
+	return array('ok' => (bool)$ok, 'error' => $ok ? '' : 'Failed to save message.');
+}
+
+// One singer's own thread - both directions. Hidden messages are omitted so a
+// message the KJ has hidden disappears from the singer's view too.
+function getChatThread($singerId)
+{
+	global $db;
+	$messages = array();
+	$stmt = $db->prepare("SELECT message_id, from_kj, message_text, strftime('%s', sent_time) AS unixtime FROM chat_messages WHERE singer_id = :sid AND hidden = 0 ORDER BY message_id ASC");
+	$stmt->execute(array(':sid' => (int)$singerId));
+	foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row)
+	{
+		$msg = array();
+		$msg['message_id'] = (int)$row['message_id'];
+		$msg['from_kj'] = (bool)$row['from_kj'];
+		$msg['message_text'] = $row['message_text'];
+		$msg['sent_time'] = (int)$row['unixtime'];
+		$messages[] = $msg;
+	}
+	return $messages;
+}
+
+// The KJ's view: every thread merged into one chronological stream, with the
+// sending singer's name attached to each message. Hidden messages are included
+// but flagged, so the KJ can still see (and potentially unhide) them.
+function getChatOverview()
+{
+	global $db;
+	$chat = array();
+	$sql = "SELECT m.message_id, m.singer_id, m.from_kj, m.message_text, m.hidden, "
+	     . "strftime('%s', m.sent_time) AS unixtime, s.username, s.muted "
+	     . "FROM chat_messages m LEFT JOIN singers s ON s.singer_id = m.singer_id "
+	     . "ORDER BY m.message_id ASC";
+	$result = $db->query($sql);
+	if ($result)
+	{
+		foreach ($result as $row)
+		{
+			$msg = array();
+			$msg['message_id'] = (int)$row['message_id'];
+			$msg['singer_id'] = (int)$row['singer_id'];
+			$msg['username'] = $row['username'];
+			$msg['from_kj'] = (bool)$row['from_kj'];
+			$msg['message_text'] = $row['message_text'];
+			$msg['hidden'] = (bool)$row['hidden'];
+			$msg['muted'] = (bool)$row['muted'];
+			$msg['sent_time'] = (int)$row['unixtime'];
+			$chat['messages'][] = $msg;
+		}
+	}
+	return $chat;
+}
+
+// Soft-hide rather than delete, so the KJ can undo a mis-click. Everything is
+// cleared wholesale at the end of the night anyway.
+function setChatMessageHidden($messageId, $hidden)
+{
+	global $db;
+	$stmt = $db->prepare("UPDATE chat_messages SET hidden = :h WHERE message_id = :id");
+	$ok = $stmt->execute(array(':h' => $hidden ? 1 : 0, ':id' => (int)$messageId));
+	if ($ok)
+	{
+		newChatSerial();
+	}
+	return $ok;
+}
+
+function clearChat()
+{
+	global $db;
+	$ok = $db->exec("DELETE FROM chat_messages");
+	newChatSerial();
+	return $ok !== false;
 }
 
 ?>
