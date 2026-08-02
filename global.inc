@@ -88,6 +88,9 @@ function siteheader($title)
     			function submitreq(varid){
         			window.location = \"./submitreq.php?id=\" + varid;
     			}
+    			function submitstreamreq(varid){
+        			window.location = \"./submitreq.php?stream_id=\" + varid;
+    			}
 		</script>
 	      </head><body>";
 }
@@ -485,6 +488,60 @@ function clearChat()
 	$ok = $db->exec("DELETE FROM chat_messages");
 	newChatSerial();
 	return $ok !== false;
+}
+
+// ---------------------------------------------------------------------------
+// Stream library - synced from OpenKJ's own shared stream catalog, so singers
+// can find and request a song someone already added via chat previously,
+// without having to message the KJ again for the same song.
+// ---------------------------------------------------------------------------
+
+$db->exec("CREATE TABLE IF NOT EXISTS streamLibrary (stream_id INTEGER PRIMARY KEY AUTOINCREMENT, local_id INTEGER UNIQUE NOT NULL, artist TEXT, title TEXT, url TEXT, duration INTEGER DEFAULT 0)");
+
+// Pushed by OpenKJ whenever a KJ adds a new stream song. Keyed on local_id
+// (OpenKJ's own streamLibrary.id) so re-pushing the same entry - e.g. after
+// an app restart - updates in place rather than creating a duplicate.
+function addOrUpdateStreamLibraryEntry($localId, $artist, $title, $url, $duration)
+{
+	global $db;
+	$stmt = $db->prepare(
+		"INSERT INTO streamLibrary (local_id, artist, title, url, duration) VALUES (:lid, :artist, :title, :url, :duration) " .
+		"ON CONFLICT(local_id) DO UPDATE SET artist=excluded.artist, title=excluded.title, url=excluded.url, duration=excluded.duration"
+	);
+	return $stmt->execute(array(
+		':lid' => (int)$localId,
+		':artist' => $artist,
+		':title' => $title,
+		':url' => $url,
+		':duration' => (int)$duration
+	));
+}
+
+// Same multi-term AND-matched LIKE search style as the local songdb search in
+// search.php, applied to artist+title instead of a pre-built combined column.
+function searchStreamLibrary($terms)
+{
+	global $db;
+	$where = array();
+	$params = array();
+	foreach ($terms as $i => $term)
+	{
+		$where[] = "(artist || ' ' || title) LIKE :term$i";
+		$params[":term$i"] = '%' . $term . '%';
+	}
+	$sql = "SELECT stream_id, artist, title FROM streamLibrary WHERE " . implode(' AND ', $where) . " ORDER BY UPPER(artist), UPPER(title)";
+	$stmt = $db->prepare($sql);
+	$stmt->execute($params);
+	return $stmt->fetchAll(PDO::FETCH_ASSOC);
+}
+
+function getStreamLibraryEntry($streamId)
+{
+	global $db;
+	$stmt = $db->prepare("SELECT stream_id, artist, title, url, duration FROM streamLibrary WHERE stream_id = :id");
+	$stmt->bindValue(':id', (int)$streamId);
+	$stmt->execute();
+	return $stmt->fetch(PDO::FETCH_ASSOC);
 }
 
 ?>

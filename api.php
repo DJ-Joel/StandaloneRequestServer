@@ -403,4 +403,18 @@ if ($command == "clearChat")
 	exit();
 }
 
+if ($command == "addStreamLibraryEntry")
+{
+	$localId = isset($data['localId']) ? (int)$data['localId'] : 0;
+	$artist = isset($data['artist']) ? $data['artist'] : '';
+	$title = isset($data['title']) ? $data['title'] : '';
+	$url = isset($data['url']) ? $data['url'] : '';
+	$duration = isset($data['duration']) ? (int)$data['duration'] : 0;
+	$ok = ($localId > 0) && ($url !== '') && addOrUpdateStreamLibraryEntry($localId, $artist, $title, $url, $duration);
+	$output = array('command'=>$command,'error'=> $ok ? 'false' : 'true');
+	header('Content-type: application/json');
+	print(json_encode($output,JSON_PRETTY_PRINT|JSON_UNESCAPED_SLASHES));
+	exit();
+}
+
 ?>
