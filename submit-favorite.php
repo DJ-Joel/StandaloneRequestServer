@@ -19,7 +19,7 @@ if (!$row)
 
 $artist = $row['artist'];
 $title = $row['title'];
-$defaultSinger = htmlspecialchars(currentUsername());
+$defaultSinger = htmlspecialchars(currentSingerName());
 
 echo "<br><p>Submitting Song:<br>";
 echo "<p>" . htmlspecialchars("$artist - $title") . "</p>";

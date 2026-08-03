@@ -417,4 +417,41 @@ if ($command == "addStreamLibraryEntry")
 	exit();
 }
 
+// ---------------------------------------------------------------------------
+// Singer account admin - surfaced in OpenKJ's own Settings dialog.
+// ---------------------------------------------------------------------------
+
+if ($command == "listSingers")
+{
+	$output = array('command'=>$command,'error'=>'false','singers'=>listSingers());
+	header('Content-type: application/json');
+	print(json_encode($output,JSON_PRETTY_PRINT|JSON_UNESCAPED_SLASHES));
+	exit();
+}
+
+if ($command == "deleteSinger")
+{
+	$singerId = isset($data['singerId']) ? (int)$data['singerId'] : 0;
+	$ok = ($singerId > 0) && deleteSinger($singerId);
+	$output = array('command'=>$command,'error'=> $ok ? 'false' : 'true');
+	header('Content-type: application/json');
+	print(json_encode($output,JSON_PRETTY_PRINT|JSON_UNESCAPED_SLASHES));
+	exit();
+}
+
+if ($command == "resetSingerPassword")
+{
+	$singerId = isset($data['singerId']) ? (int)$data['singerId'] : 0;
+	$tempPassword = $singerId > 0 ? resetSingerPassword($singerId) : null;
+	$output = array(
+		'command'=>$command,
+		'error'=> $tempPassword !== null ? 'false' : 'true',
+		'singerId'=> $singerId,
+		'tempPassword'=> $tempPassword !== null ? $tempPassword : ''
+	);
+	header('Content-type: application/json');
+	print(json_encode($output,JSON_PRETTY_PRINT|JSON_UNESCAPED_SLASHES));
+	exit();
+}
+
 ?>

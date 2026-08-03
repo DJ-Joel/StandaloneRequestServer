@@ -19,6 +19,32 @@ try {
 }
 
 $db->exec("CREATE TABLE IF NOT EXISTS singers (singer_id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT UNIQUE NOT NULL, password_hash TEXT NOT NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)");
+
+// Migrate from the old username-only login to email+name. Detect the old
+// schema by checking for the email column - if it's missing, this is a
+// pre-migration database. Existing accounts have no email on file and can't
+// be carried forward, so this does a clean wipe rather than a partial
+// migration: singers, plus favorites and chat_messages, since both reference
+// singer_id and would otherwise be left pointing at accounts that no longer
+// exist.
+$singersHasEmail = false;
+foreach ($db->query("PRAGMA table_info(singers)") as $col)
+{
+	if ($col['name'] === 'email')
+	{
+		$singersHasEmail = true;
+	}
+}
+if (!$singersHasEmail)
+{
+	$db->exec("DROP TABLE IF EXISTS singers");
+	$db->exec("DROP TABLE IF EXISTS favorites");
+	$db->exec("DROP TABLE IF EXISTS chat_messages");
+	$db->exec("CREATE TABLE singers (singer_id INTEGER PRIMARY KEY AUTOINCREMENT, email TEXT UNIQUE NOT NULL, name TEXT NOT NULL, password_hash TEXT NOT NULL, muted INTEGER NOT NULL DEFAULT 0, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)");
+	$db->exec("CREATE TABLE favorites (favorite_id INTEGER PRIMARY KEY AUTOINCREMENT, singer_id INTEGER NOT NULL, artist TEXT NOT NULL, title TEXT NOT NULL, added_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, UNIQUE(singer_id, artist, title))");
+	$db->exec("CREATE TABLE chat_messages (message_id INTEGER PRIMARY KEY AUTOINCREMENT, singer_id INTEGER NOT NULL, from_kj INTEGER NOT NULL DEFAULT 0, message_text TEXT NOT NULL, sent_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP, hidden INTEGER NOT NULL DEFAULT 0)");
+}
+
 $db->exec("CREATE TABLE IF NOT EXISTS favorites (favorite_id INTEGER PRIMARY KEY AUTOINCREMENT, singer_id INTEGER NOT NULL, artist TEXT NOT NULL, title TEXT NOT NULL, added_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, UNIQUE(singer_id, artist, title))");
 $db->exec("CREATE INDEX IF NOT EXISTS idx_favorites_singer ON favorites(singer_id)");
 
@@ -251,9 +277,14 @@ function currentSingerId()
 	return isset($_SESSION['singer_id']) ? (int)$_SESSION['singer_id'] : null;
 }
 
-function currentUsername()
+function currentSingerName()
 {
-	return $_SESSION['username'] ?? null;
+	return $_SESSION['name'] ?? null;
+}
+
+function currentSingerEmail()
+{
+	return $_SESSION['email'] ?? null;
 }
 
 // Sends the browser to $redirectTo and stops execution if nobody is logged
@@ -271,8 +302,8 @@ function accountLinks()
 {
 	if (isLoggedIn())
 	{
-		$username = htmlspecialchars(currentUsername());
-		echo "<span class=accountbar>Signed in as $username &middot; <a class=navbar href=\"favorites.php\">My Favorites</a> &middot; <a class=navbar href=\"chat.php\">Message KJ</a> &middot; <a class=navbar href=\"logout.php\">Log out</a></span>";
+		$name = htmlspecialchars(currentSingerName());
+		echo "<span class=accountbar>Signed in as $name &middot; <a class=navbar href=\"favorites.php\">My Favorites</a> &middot; <a class=navbar href=\"chat.php\">Message KJ</a> &middot; <a class=navbar href=\"logout.php\">Log out</a></span>";
 	}
 	else
 	{
@@ -542,6 +573,64 @@ function getStreamLibraryEntry($streamId)
 	$stmt->bindValue(':id', (int)$streamId);
 	$stmt->execute();
 	return $stmt->fetch(PDO::FETCH_ASSOC);
+}
+
+// ---------------------------------------------------------------------------
+// Singer account admin - list/delete/reset, surfaced in OpenKJ's own Settings
+// dialog rather than a web page, matching how chat moderation already works.
+// ---------------------------------------------------------------------------
+
+function listSingers()
+{
+	global $db;
+	$singers = array();
+	$sql = "SELECT singer_id, name, email, muted, created_at FROM singers ORDER BY name COLLATE NOCASE";
+	foreach ($db->query($sql) as $row)
+	{
+		$singers[] = array(
+			'id' => (int)$row['singer_id'],
+			'name' => $row['name'],
+			'email' => $row['email'],
+			'muted' => (bool)$row['muted'],
+			'created_at' => $row['created_at']
+		);
+	}
+	return $singers;
+}
+
+// Deletes an account and everything tied to it - there's no reason to keep
+// orphaned favorites or chat history around once the account is gone.
+function deleteSinger($singerId)
+{
+	global $db;
+	$singerId = (int)$singerId;
+	$db->prepare("DELETE FROM favorites WHERE singer_id = :id")->execute(array(':id' => $singerId));
+	$db->prepare("DELETE FROM chat_messages WHERE singer_id = :id")->execute(array(':id' => $singerId));
+	$stmt = $db->prepare("DELETE FROM singers WHERE singer_id = :id");
+	return $stmt->execute(array(':id' => $singerId));
+}
+
+// KJ-assisted reset: generates a random temporary password, stores its hash,
+// and returns the plaintext once so the KJ can relay it to the singer in
+// person. There's no email delivery, so this is the only place the plaintext
+// ever exists - not logged, not stored.
+function resetSingerPassword($singerId)
+{
+	global $db;
+	$chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
+	$tempPassword = '';
+	for ($i = 0; $i < 8; $i++)
+	{
+		$tempPassword .= $chars[random_int(0, strlen($chars) - 1)];
+	}
+	$hash = password_hash($tempPassword, PASSWORD_DEFAULT);
+	$stmt = $db->prepare("UPDATE singers SET password_hash = :hash WHERE singer_id = :id");
+	$ok = $stmt->execute(array(':hash' => $hash, ':id' => (int)$singerId));
+	if (!$ok)
+	{
+		return null;
+	}
+	return $tempPassword;
 }
 
 ?>
