@@ -403,4 +403,55 @@ if ($command == "clearChat")
 	exit();
 }
 
+if ($command == "addStreamLibraryEntry")
+{
+	$localId = isset($data['localId']) ? (int)$data['localId'] : 0;
+	$artist = isset($data['artist']) ? $data['artist'] : '';
+	$title = isset($data['title']) ? $data['title'] : '';
+	$url = isset($data['url']) ? $data['url'] : '';
+	$duration = isset($data['duration']) ? (int)$data['duration'] : 0;
+	$ok = ($localId > 0) && ($url !== '') && addOrUpdateStreamLibraryEntry($localId, $artist, $title, $url, $duration);
+	$output = array('command'=>$command,'error'=> $ok ? 'false' : 'true');
+	header('Content-type: application/json');
+	print(json_encode($output,JSON_PRETTY_PRINT|JSON_UNESCAPED_SLASHES));
+	exit();
+}
+
+// ---------------------------------------------------------------------------
+// Singer account admin - surfaced in OpenKJ's own Settings dialog.
+// ---------------------------------------------------------------------------
+
+if ($command == "listSingers")
+{
+	$output = array('command'=>$command,'error'=>'false','singers'=>listSingers());
+	header('Content-type: application/json');
+	print(json_encode($output,JSON_PRETTY_PRINT|JSON_UNESCAPED_SLASHES));
+	exit();
+}
+
+if ($command == "deleteSinger")
+{
+	$singerId = isset($data['singerId']) ? (int)$data['singerId'] : 0;
+	$ok = ($singerId > 0) && deleteSinger($singerId);
+	$output = array('command'=>$command,'error'=> $ok ? 'false' : 'true');
+	header('Content-type: application/json');
+	print(json_encode($output,JSON_PRETTY_PRINT|JSON_UNESCAPED_SLASHES));
+	exit();
+}
+
+if ($command == "resetSingerPassword")
+{
+	$singerId = isset($data['singerId']) ? (int)$data['singerId'] : 0;
+	$tempPassword = $singerId > 0 ? resetSingerPassword($singerId) : null;
+	$output = array(
+		'command'=>$command,
+		'error'=> $tempPassword !== null ? 'false' : 'true',
+		'singerId'=> $singerId,
+		'tempPassword'=> $tempPassword !== null ? $tempPassword : ''
+	);
+	header('Content-type: application/json');
+	print(json_encode($output,JSON_PRETTY_PRINT|JSON_UNESCAPED_SLASHES));
+	exit();
+}
+
 ?>

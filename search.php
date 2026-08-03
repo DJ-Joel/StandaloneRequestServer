@@ -51,7 +51,6 @@ $res = array();
 		$res[$row['song_id']] = $row['artist'] . " - " . $row['title'];
 	}
         }
-    $db = null;
 
 $unique = array_unique($res);
 
@@ -63,7 +62,25 @@ foreach ($unique as $key => $val) {
 	}
 	$entries[] = "<tr><td class=result onclick=\"submitreq({$key})\">" . $val . "</td>$favCell</tr>";
 }
-if (count($unique) > 0) {
+
+// Stream library results - songs a KJ previously added via a stream link
+// (e.g. from a chat request) that aren't in the local songdb catalog at all.
+// Same search terms, matched against artist+title instead of a combined col.
+$streamRows = searchStreamLibrary($terms);
+foreach ($streamRows as $row) {
+	$label = htmlspecialchars($row['artist'] . " - " . $row['title']) . " <span class=streamtag>(stream)</span>";
+	if (isLoggedIn()) {
+		$favCell = "<td class=favcol><a class=favstar href=\"favorite-add.php?stream_id={$row['stream_id']}\" title=\"Save to favorites\">&#9734;</a></td>";
+	} else {
+		$favCell = "<td class=favcol></td>";
+	}
+	$entries[] = "<tr><td class=result onclick=\"submitstreamreq({$row['stream_id']})\">" . $label . "</td>$favCell</tr>";
+}
+
+$totalResults = count($unique) + count($streamRows);
+$db = null;
+
+if ($totalResults > 0) {
 	echo '<table border=1>';
 	foreach ($entries as $song) {
 		echo $song;

@@ -5,13 +5,18 @@ $error = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST')
 {
-	$username = trim($_POST['username'] ?? '');
+	$email = trim($_POST['email'] ?? '');
+	$name = trim($_POST['name'] ?? '');
 	$password = $_POST['password'] ?? '';
 	$confirm = $_POST['confirm'] ?? '';
 
-	if ($username === '' || strlen($username) < 3 || strlen($username) > 30 || !preg_match('/^[A-Za-z0-9_ ]+$/', $username))
+	if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL))
 	{
-		$error = 'Username must be 3-30 characters (letters, numbers, spaces, and underscores only).';
+		$error = 'Enter a valid email address.';
+	}
+	elseif ($name === '' || strlen($name) > 40)
+	{
+		$error = 'Enter a name (up to 40 characters).';
 	}
 	elseif (strlen($password) < 6)
 	{
@@ -23,22 +28,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST')
 	}
 	else
 	{
-		$check = $db->prepare("SELECT singer_id FROM singers WHERE username = :u");
-		$check->execute(array(':u' => $username));
+		$check = $db->prepare("SELECT singer_id FROM singers WHERE email = :e");
+		$check->execute(array(':e' => $email));
 		if ($check->fetch())
 		{
-			$error = 'That username is already taken. Please choose another.';
+			$error = 'An account with that email already exists.';
 		}
 		else
 		{
 			$hash = password_hash($password, PASSWORD_DEFAULT);
-			$ins = $db->prepare("INSERT INTO singers (username, password_hash) VALUES (:u, :p)");
-			$ins->execute(array(':u' => $username, ':p' => $hash));
+			$ins = $db->prepare("INSERT INTO singers (email, name, password_hash) VALUES (:e, :n, :p)");
+			$ins->execute(array(':e' => $email, ':n' => $name, ':p' => $hash));
 			$singerId = $db->lastInsertId();
 			// Regenerate the session id on privilege change to avoid session fixation.
 			session_regenerate_id(true);
 			$_SESSION['singer_id'] = $singerId;
-			$_SESSION['username'] = $username;
+			$_SESSION['email'] = $email;
+			$_SESSION['name'] = $name;
 			header("Location: favorites.php?welcome=1");
 			exit();
 		}
@@ -55,10 +61,12 @@ if ($error !== '')
 	echo "<br><p class=error>" . htmlspecialchars($error) . "</p>";
 }
 
-$prefillUsername = htmlspecialchars($_POST['username'] ?? '');
+$prefillEmail = htmlspecialchars($_POST['email'] ?? '');
+$prefillName = htmlspecialchars($_POST['name'] ?? '');
 
 echo "<br><form method=post action=register.php>
-Username:<br><input type=text name=username autocomplete=username autofocus value=\"$prefillUsername\"><br>
+Email:<br><input type=email name=email autocomplete=email autofocus value=\"$prefillEmail\"><br>
+Name (used for the rotation):<br><input type=text name=name autocomplete=name value=\"$prefillName\"><br>
 Password:<br><input type=password name=password autocomplete=new-password><br>
 Confirm password:<br><input type=password name=confirm autocomplete=new-password><br>
 <input type=submit value=\"Create account\">
