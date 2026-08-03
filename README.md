@@ -13,12 +13,12 @@ Phase 1:  Making your **Windows based** computer a web server inside home or ven
 You need to install some files on your computer before you can make it a web server:
 Go here https://wampserver.aviatechno.net/
 Scroll to the bottom and find the sections called Best way to install Visual C++ Redistributable Packages
-There will be a link to the file Visual C++ Redistributable Runtimes All-in-One
+There will be a link to the Visual C++ Redistributable Runtimes All-in-One
 Download it
 Unzip it
 Double click the file INSTALL_ALL.BAT
 
-Once that is complete you will need to install the Web Server Software called WAMP Server
+Once that is complete you will need to install the Web Server Software called WAMP Server:
 Back at the same web site as before (https://wampserver.aviatechno.net/) find the section called Installers Wampserver full install version
 There will be a link to the LATEST VERSION
 Download and Install that file at c:\
@@ -32,24 +32,25 @@ Phase 2:  Pointing OpenKJ to your computer to see song requests
 Go to the root folder of your drive and open the WAMP64 folder, then open the www folder.
 Create a folder called requests    (all lower case letters)
 Download the ZIP file from this repository
-Extract the contents of the ZIP file to the requests folder
+Extract the contents of the ZIP file to the requests folder making sure the files land directly in the request folder.
+There should not be any folders inside the request folder.
 
 In the OpenKJ application:
 click on Tools  >>  Settings  >>  Network
 Enter this in the SERVER URL field
 http://###.###.#.###:80/requests/api.php   (The ### is your computer's IP address)
 Check the box to IGNORE HTTPS CERTIFICATE ERRORS
+Click the TEST button
 Close this window
-Click on KARAOKE  >> INCOMING REQUESTS
+In the tool bar Click on KARAOKE  >> INCOMING REQUESTS
 Click on UPDATE REMOTE DB    (this could take a while depending on how many songs you have)
+Check the box to Allow Requests
 
 Open a web browser and go to 
 http://###.###.#.###/requests
-
 You should see your Request Search screen
-You can search but you cannot request unless you have turned on requests in OpenKJ
-Click on KARAOKE  >> INCOMING REQUESTS
-Check the box to Allow Requests
+
+
 
 
 Phase 3:  Running the request server when you are ready to sing.
