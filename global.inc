@@ -269,7 +269,15 @@ function getVenues()
 
 function isLoggedIn()
 {
-	return isset($_SESSION['singer_id']);
+	// Also require 'name', not just singer_id - a session established before
+	// the email/name migration has singer_id set (from the old code) but
+	// never got 'name' populated, since that key didn't exist yet. Without
+	// this check, such a session reads as logged in but every downstream
+	// call to currentSingerName() returns null, crashing whatever tries to
+	// display it. Treating it as logged out forces a clean re-login instead,
+	// which is also correct since that old singer_id may no longer exist at
+	// all - the migration replaces the singers table entirely.
+	return isset($_SESSION['singer_id']) && isset($_SESSION['name']);
 }
 
 function currentSingerId()
