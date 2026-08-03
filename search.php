@@ -69,7 +69,11 @@ foreach ($unique as $key => $val) {
 $streamRows = searchStreamLibrary($terms);
 foreach ($streamRows as $row) {
 	$label = htmlspecialchars($row['artist'] . " - " . $row['title']) . " <span class=streamtag>(stream)</span>";
-	$favCell = isLoggedIn() ? "<td class=favcol></td>" : "<td class=favcol></td>";
+	if (isLoggedIn()) {
+		$favCell = "<td class=favcol><a class=favstar href=\"favorite-add.php?stream_id={$row['stream_id']}\" title=\"Save to favorites\">&#9734;</a></td>";
+	} else {
+		$favCell = "<td class=favcol></td>";
+	}
 	$entries[] = "<tr><td class=result onclick=\"submitstreamreq({$row['stream_id']})\">" . $label . "</td>$favCell</tr>";
 }
 
