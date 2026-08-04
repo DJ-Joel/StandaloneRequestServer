@@ -1,3 +1,5 @@
+Work has stopped on this branch.  A new branch has been created that is a quick installer package.
+
 # OpenKJ Standalone Request Server
 Standalone basic single-venue request server implementation **for use with OpenKJ 2.50.1** post your songbook for singers to access on their device via web
 
@@ -9,6 +11,7 @@ Standalone basic single-venue request server implementation **for use with OpenK
 
 
 Phase 1:  Making your **Windows based** computer a web server inside home or venue:
+There are many ways to do this, this is just one way.
 
 You need to install some files on your computer before you can make it a web server:
 Go here https://wampserver.aviatechno.net/
